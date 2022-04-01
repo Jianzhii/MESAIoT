@@ -1,77 +1,71 @@
-#include "arduino_secrets.h"
+// import libraries for WiFI and Http requests
+#include <NTPClient.h>
 #include <WiFiUdp.h>
+#include "ThingSpeak.h"
 
-#include "thingProperties.h"
 #include "telegram.h"
 
-// group chat: -1001318460964
+char* sleepBody = "{\"chat_id\": -1001318460964, \"text\": \"Its sleeping time..\"}";
+char* motionBody = "{\"chat_id\": -1001318460964, \"text\": \"No motion detected for 5 minute.\"}";
+char* soundBody = "{\"chat_id\": -1001318460964, \"text\": \"Loud sounds have been detected...\"}";
 
 const long utcOffsetInSeconds = 28800;
-char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
-int motionPin = 5;              // the pin that the sensor is atteched to
-int soundPin = 16;
+int motionPin = 5;              
+int soundPin = A0;
 int motionCounter = 0;
+int motionVal;
+int soundVal;
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
+WiFiClient  client;
 
-void setup() {
+void setup() { 
   pinMode(motionPin, INPUT);
-  pinMode(soundPin, INPUT);
-  // Initialize serial and wait for port to open:
-  Serial.begin(9600);
-  // This delay gives the chance to wait for a Serial Monitor without blocking if none is found
-  delay(1500);
-
-  // Defined in thingProperties.h
-  initProperties();
-
-  // Connect to Arduino IoT Cloud
-  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
-  timeClient.begin();
-
-  /*
-     The following function allows you to obtain more information
-     related to the state of network and IoT Cloud connection and errors
-     the higher number the more granular information you’ll get.
-     The default is 0 (only errors).
-     Maximum is 4
-  */
-  setDebugMessageLevel(2);
-  ArduinoCloud.printDebugInfo();
+//  pinMode(soundPin, INPUT);
+  Serial.begin(9600);        // initialize serial
   
-  delay(10000);
+  // connect to Wifi
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(wifiname, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("connecting....");
+  }
+  Serial.println("Connected");
+  ThingSpeak.begin(client); 
+  timeClient.begin();
 }
 
 void loop() {
-  ArduinoCloud.update();
   timeClient.update();
-
   Serial.println("############## Motion Check ##############");
-
-  motionVal = digitalRead(motionPin);
-  Serial.print("Motion Sensor Value: ");
-  Serial.println(motionVal);
-
-  if (timeClient.getHours() > 2 or timeClient.getHours() < 3) {
+  if (timeClient.getHours() > 22 and timeClient.getHours() < 6) {
     Serial.println("it is morning they sleeping hello");
-    char* body = "{\"chat_id\": -741531015, \"text\": \"sleeping larh dey.\"}";
-    sendTele(body);
+    sendTele(sleepBody);
+    motionCounter += 5;
   } else {
+    motionVal = digitalRead(motionPin);
+    Serial.print("Motion Sensor Value: ");
+    Serial.println(motionVal);
+    int res; 
+    do {
+      Serial.println("Attempting to update ThingSpeak...");
+      res = ThingSpeak.writeField(channelNo, 2, motionVal, writeKey);
+      delay(1000);
+      motionCounter += 1;
+    } while (res != 200);
+    Serial.println("Channel update successful.");
+    
     if (motionVal == 0) {
-      motionCounter += 5;
-      if (motionCounter == 60) {
+      motionCounter += 1;
+      if (motionCounter >= 300) {
         motionCounter = 0;
-        Serial.println("No motion detected for 1 minute") ;
-
-        // bool sent = false;
-        // while (not sent) {
-        char* body = "{\"chat_id\": -741531015, \"text\": \"No motion detected for 1 minute.\"}";
-        sendTele(body);
-        //   Serial.println("sending message");
-        // }
+        Serial.println("No motion detected for 5 minute");
+        sendTele(motionBody);
+        motionCounter += 5;
       }
     } else {
       motionCounter = 0 ;
@@ -79,32 +73,26 @@ void loop() {
   }
 
   Serial.println("############## Sound Check ##############");
-  soundVal = digitalRead(soundPin);
+  soundVal = analogRead(soundPin);
 
   Serial.print("Sound Sensor Value: ");
   Serial.println(soundVal);
-
-  if (soundVal == HIGH) {
+  int res; 
+  do {
+    Serial.println("Attempting to update ThingSpeak...");
+    res = ThingSpeak.writeField(channelNo, 1, soundVal, writeKey);
+    delay(1000);
+    motionCounter += 1;
+  } while (res != 200);        
+  Serial.println("Channel update successful.");
+  
+  if (soundVal > 50) {
     Serial.println("Loud sound detected");
-    // bool sent = false;
-    // while (not sent) {
-    char* body = "{\"chat_id\": -741531015, \"text\": \"Loud sounds have been detected...\"}";
-    sendTele(body);
-    //   Serial.println("sending message");
-    // }
+    sendTele(soundBody);
+    motionCounter += 5;
   } else {
     Serial.println("No sound detected");
   }
-
-  delay(2000); // wait 2s for next reading
-}
-
-
-
-/*
-  Since Val is READ_WRITE variable, onValChange() is
-  executed every time a new value is received from IoT Cloud.
-*/
-void onValChange()  {
-  // Add your code here to act upon Val change
+  
+  delay(1000);
 }
