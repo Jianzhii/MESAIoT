@@ -7,12 +7,16 @@
 char* body = "{\"chat_id\": -1001318460964, \"text\": \"Potential gas leak or fire!\"}";
 
 int gasPin = A0;
+int led = 16 ;
 float gasValue;
 
+WiFiUDP ntpUDP;
 WiFiClient  client;
-void setup(){
+
+void setup() {
+  pinMode(gasPin, INPUT);
+  pinMode(led, OUTPUT);
   Serial.begin(9600); // sets the serial port to 9600
-  Serial.println("Gas sensor warming up!");
 
   // connect to Wifi
   WiFi.mode(WIFI_STA);
@@ -32,10 +36,12 @@ void loop(){
   Serial.print("Sensor Value: ");
   Serial.println(gasValue);
   
-  if(gasValue > 50)
-  {
+  if(gasValue > 60) {
     Serial.println("Smoke detected!");
     sendTele(body);
+    digitalWrite(led,HIGH);
+  } else {
+    digitalWrite(led,LOW);
   }
   
   int res; 
@@ -47,5 +53,5 @@ void loop(){
   Serial.println("Channel update successful.");
   
   Serial.println("");
-  delay(2000); // wait 2s for next reading
+  delay(120000); // wait 2 min for next reading
 }
