@@ -14,11 +14,11 @@ char* takenBody = "{\"chat_id\": -1001318460964, \"text\": \"Elderly has taken m
 
 const long utcOffsetInSeconds = 28800;
 
-int touch = 0 ;
-int led = 16 ;
-float pressureVal = 0 ;
+int touch = 0;
+int led = 16;
+float pressureVal = 0;
 
-bool medicationTaken = false ;
+bool medicationTaken = false;
 bool reminderSent = false;
 
 WiFiUDP ntpUDP;
@@ -29,31 +29,33 @@ void setup() {
   pinMode(touch, INPUT);
   pinMode(led, OUTPUT);
 
-  timeClient.begin();
   Serial.begin(9600);
 
-  // connect to Wifi
   WiFi.mode(WIFI_STA);
   WiFi.begin(wifiname, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.println("connecting....");
   }
+
   Serial.println("Connected");
   ThingSpeak.begin(client); 
   timeClient.begin();
 } 
 
-void loop() {
+void loop() {  
   timeClient.update();
+
   pressureVal = analogRead(touch);
   Serial.println(pressureVal);
+  
   if (pressureVal < 50) {
     medicationTaken = true;
+    digitalWrite(led, LOW);
     int res ;
     do {
       Serial.println("Atttempting to update ThingSpeak...");
-      res = ThingSpeak.writeField(channelNo, 3, pressureVal, writeKey);
+      res = ThingSpeak.writeField(channelNo, 3, 1, writeKey);
       delay(1000);
     } while (res!=200);
     Serial.println("Channel update successful.");
@@ -67,25 +69,22 @@ void loop() {
     }
   }
 
-  if (timeClient.getHours() == 22 && timeClient.getMinutes() == 00 && timeClient.getSeconds() == 0) {
+  if (timeClient.getHours() == 22 && timeClient.getMinutes() == 00 && timeClient.getSeconds() == 00) {
     if (not medicationTaken) {      
       reminderSent = true;
       sendTele(secondMedicineBody);
-    } else {
-      digitalWrite(led, LOW);
     }
   }
 
   if (reminderSent and medicationTaken) {
     sendTele(takenBody);
-    digitalWrite(led, LOW);
+    reminderSent = false;
+  }
+
+  if (timeClient.getHours() == 00 && timeClient.getMinutes() == 00 && timeClient.getSeconds() == 00) {
     reminderSent = false;
     medicationTaken = false;
   }
 
-  if (timeClient.getHours() == 00 && timeClient.getMinutes() == 0 && timeClient.getSeconds() == 0) {
-    reminderSent = false;
-    medicationTaken = false;
-  }
-  delay(1000);
+  delay(1000);  
 }
