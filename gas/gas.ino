@@ -1,6 +1,4 @@
-#include <WiFiUdp.h>
 #include "ThingSpeak.h"
-
 #include "telegram.h"
 
 char* body = "{\"chat_id\": -1001318460964, \"text\": \"Potential gas leak or fire!\"}";
@@ -9,7 +7,6 @@ int gasPin = A0;
 int led = 16 ;
 float gasValue;
 
-WiFiUDP ntpUDP;
 WiFiClient  client;
 
 void setup() {
