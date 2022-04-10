@@ -1,4 +1,3 @@
-#include <NTPClient.h>
 #include <WiFiUdp.h>
 #include "ThingSpeak.h"
 
